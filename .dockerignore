@@ -1,0 +1,4 @@
+target/
+docker/.env
+docker/models/*
+!docker/models/.gitkeep

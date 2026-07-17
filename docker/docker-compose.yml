@@ -1,0 +1,108 @@
+# Sealed inference cell — mtrxai-icell TLS proxy + inference engine (llama.cpp or Ollama).
+#
+#   cd mtrxAI/icell/docker
+#   cp .env.example .env
+#   docker compose up -d --build                    # llama.cpp (default)
+#   docker compose --profile ollama up -d --build   # Ollama backend
+#
+# Admin: GET https://localhost:8443/mtrxai/v1/info
+# HF pull: POST https://localhost:8443/mtrxai/v1/models/pull
+
+services:
+  icell:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        INFERENCE_BACKEND: llamacpp
+        LLAMA_IMAGE: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
+    image: ${CELL_IMAGE:-mtrxai-icell:local}
+    container_name: mtrxai-icell
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    ports:
+      - "${HTTPS_PUBLISH_PORT:-8443}:8443"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ${MODELS_HOST_PATH:-./models}:/models
+    environment:
+      INFERENCE_BACKEND: llamacpp
+      CELL_ADMIN_TOKEN: ${CELL_ADMIN_TOKEN:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+      LLAMA_API_KEY: ${LLAMA_API_KEY:-}
+      LLAMA_EXTRA_ARGS: ${LLAMA_EXTRA_ARGS:-}
+      HTTPS_PORT: "8443"
+      TLS_ROTATE_SECS: ${TLS_ROTATE_SECS:-3600}
+      TLS_CERT_CN: ${TLS_CERT_CN:-llama-inference.local}
+      MODELS_MAX: ${MODELS_MAX:-4}
+      MODEL_MAX_BYTES: ${MODEL_MAX_BYTES:-85899345920}
+      AUTO_LOAD_AFTER_PULL: ${AUTO_LOAD_AFTER_PULL:-true}
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  icell-ollama:
+    profiles: [ollama]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        INFERENCE_BACKEND: ollama
+        OLLAMA_IMAGE: ${OLLAMA_IMAGE:-ollama/ollama:latest}
+    image: ${CELL_OLLAMA_IMAGE:-mtrxai-icell-ollama:local}
+    container_name: mtrxai-icell-ollama
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+    ports:
+      - "${HTTPS_PUBLISH_PORT:-8443}:8443"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ${MODELS_HOST_PATH:-./models}:/models
+    environment:
+      INFERENCE_BACKEND: ollama
+      CELL_ADMIN_TOKEN: ${CELL_ADMIN_TOKEN:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+      OLLAMA_MODELS: /models/.ollama
+      DELETE_GGUF_AFTER_IMPORT: ${DELETE_GGUF_AFTER_IMPORT:-false}
+      HTTPS_PORT: "8443"
+      TLS_ROTATE_SECS: ${TLS_ROTATE_SECS:-3600}
+      TLS_CERT_CN: ${TLS_CERT_CN:-llama-inference.local}
+      MODEL_MAX_BYTES: ${MODEL_MAX_BYTES:-85899345920}
+      AUTO_LOAD_AFTER_PULL: ${AUTO_LOAD_AFTER_PULL:-true}
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
