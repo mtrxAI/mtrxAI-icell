@@ -4,4 +4,4 @@ version = "0.1.0"
 [docker]
 registry = "docker.io/mtrxai"
 icell_llamacpp_image = "mtrx-icell-llamacpp"
-icell_ollama_image = "mtrx-icell-ollama"
+ollama_image = "mtrx-icell-ollama"

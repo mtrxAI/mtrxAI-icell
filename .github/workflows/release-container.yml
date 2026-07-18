@@ -32,7 +32,7 @@ jobs:
     outputs:
       version: ${{ steps.meta.outputs.version }}
       icell_llamacpp_image: ${{ steps.meta.outputs.icell_llamacpp_image }}
-      icell_ollama_image: ${{ steps.meta.outputs.icell_ollama_image }}
+      ollama_image: ${{ steps.meta.outputs.ollama_image }}
     steps:
       - name: Checkout icell
         uses: actions/checkout@v4
@@ -57,10 +57,10 @@ jobs:
           {
             echo "version=${MTRXAI_VERSION}"
             echo "icell_llamacpp_image=${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}"
-            echo "icell_ollama_image=${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}"
+            echo "ollama_image=${MTRXAI_DOCKER_OLLAMA_IMAGE}"
           } >> "${GITHUB_OUTPUT}"
           echo "Release version: ${MTRXAI_VERSION}"
-          echo "Images: ${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE} / ${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}"
+          echo "Images: ${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE} / ${MTRXAI_DOCKER_OLLAMA_IMAGE}"
 
   docker:
     name: Docker ${{ matrix.backend }} linux/${{ matrix.arch }}
@@ -87,16 +87,16 @@ jobs:
             arch: amd64
             backend: ollama
             image_slug: mtrx-icell-ollama
-            remote_output: icell_ollama_image
+            remote_output: ollama_image
           - runner: ubuntu-24.04-arm
             arch: arm64
             backend: ollama
             image_slug: mtrx-icell-ollama
-            remote_output: icell_ollama_image
+            remote_output: ollama_image
     env:
       MTRXAI_VERSION: ${{ needs.resolve-version.outputs.version }}
       MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE: ${{ needs.resolve-version.outputs.icell_llamacpp_image }}
-      MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.icell_ollama_image }}
+      MTRXAI_DOCKER_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.ollama_image }}
     steps:
       - name: Checkout icell
         uses: actions/checkout@v4
@@ -116,8 +116,8 @@ jobs:
           LOCAL_TAG="${{ matrix.image_slug }}:${MTRXAI_VERSION}-${{ matrix.arch }}"
           scripts/build-icell-docker.sh "${LOCAL_TAG}" "${{ matrix.backend }}"
           echo "LOCAL_ICELL_IMAGE=${LOCAL_TAG}" >> "$GITHUB_ENV"
-          if [[ "${{ matrix.remote_output }}" == "icell_ollama_image" ]]; then
-            echo "REMOTE_IMAGE=${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}" >> "$GITHUB_ENV"
+          if [[ "${{ matrix.remote_output }}" == "ollama_image" ]]; then
+            echo "REMOTE_IMAGE=${MTRXAI_DOCKER_OLLAMA_IMAGE}" >> "$GITHUB_ENV"
           else
             echo "REMOTE_IMAGE=${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}" >> "$GITHUB_ENV"
           fi
@@ -167,7 +167,7 @@ jobs:
     env:
       MTRXAI_VERSION: ${{ needs.resolve-version.outputs.version }}
       MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE: ${{ needs.resolve-version.outputs.icell_llamacpp_image }}
-      MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.icell_ollama_image }}
+      MTRXAI_DOCKER_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.ollama_image }}
     steps:
       - name: Create and push manifest lists
         env:
@@ -180,7 +180,7 @@ jobs:
             exit 1
           fi
           echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
-          for REMOTE in "${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}" "${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}"; do
+          for REMOTE in "${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}" "${MTRXAI_DOCKER_OLLAMA_IMAGE}"; do
             docker buildx imagetools create \
               -t "${REMOTE}:${MTRXAI_VERSION}" \
               -t "${REMOTE}:latest" \
@@ -202,7 +202,7 @@ jobs:
         env:
           VERSION: ${{ needs.resolve-version.outputs.version }}
           ICELL_LLAMACPP_IMAGE: ${{ needs.resolve-version.outputs.icell_llamacpp_image }}
-          ICELL_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.icell_ollama_image }}
+          OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.ollama_image }}
         run: |
           {
             echo "## mtrxAI icell container release v${VERSION}"
@@ -213,13 +213,13 @@ jobs:
             echo "- \`${ICELL_LLAMACPP_IMAGE}:latest\`"
             echo ""
             echo "### Docker Hub (ollama)"
-            echo "- \`${ICELL_OLLAMA_IMAGE}:${VERSION}\` (multi-arch amd64+arm64)"
-            echo "- \`${ICELL_OLLAMA_IMAGE}:${VERSION}-amd64\` / \`${ICELL_OLLAMA_IMAGE}:${VERSION}-arm64\`"
-            echo "- \`${ICELL_OLLAMA_IMAGE}:latest\`"
+            echo "- \`${OLLAMA_IMAGE}:${VERSION}\` (multi-arch amd64+arm64)"
+            echo "- \`${OLLAMA_IMAGE}:${VERSION}-amd64\` / \`${OLLAMA_IMAGE}:${VERSION}-arm64\`"
+            echo "- \`${OLLAMA_IMAGE}:latest\`"
             echo ""
             echo "### Pull"
             echo "\`\`\`bash"
             echo "docker pull ${ICELL_LLAMACPP_IMAGE}:${VERSION}"
-            echo "docker pull ${ICELL_OLLAMA_IMAGE}:${VERSION}"
+            echo "docker pull ${OLLAMA_IMAGE}:${VERSION}"
             echo "\`\`\`"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -30,14 +30,12 @@ def read_release_config() -> dict[str, str]:
     icell_llamacpp_image = _require_match(
         r'^icell_llamacpp_image\s*=\s*"([^"]+)"', text, "docker.icell_llamacpp_image"
     )
-    icell_ollama_image = _require_match(
-        r'^icell_ollama_image\s*=\s*"([^"]+)"', text, "docker.icell_ollama_image"
-    )
+    ollama_image = _require_match(r'^ollama_image\s*=\s*"([^"]+)"', text, "docker.ollama_image")
     return {
         "version": version,
         "docker_registry": registry.rstrip("/"),
         "docker_icell_llamacpp_image": icell_llamacpp_image,
-        "docker_icell_ollama_image": icell_ollama_image,
+        "docker_ollama_image": ollama_image,
     }
 
 
@@ -92,11 +90,11 @@ def print_env() -> None:
     registry = cfg["docker_registry"]
     version = cfg["version"]
     icell_llamacpp = cfg["docker_icell_llamacpp_image"]
-    icell_ollama = cfg["docker_icell_ollama_image"]
+    ollama = cfg["docker_ollama_image"]
     print(f"MTRXAI_VERSION={version}")
     print(f"MTRXAI_DOCKER_REGISTRY={registry}")
     print(f"MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE={registry}/{icell_llamacpp}")
-    print(f"MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE={registry}/{icell_ollama}")
+    print(f"MTRXAI_DOCKER_OLLAMA_IMAGE={registry}/{ollama}")
 
 
 def main() -> None:
