@@ -1,0 +1,225 @@
+name: Release Container
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (defaults to release.toml, e.g. 0.1.0)
+        required: false
+        type: string
+      push_docker:
+        description: Push images to Docker Hub (mtrxai/mtrx-icell-llamacpp, mtrxai/mtrx-icell-ollama)
+        type: boolean
+        default: true
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: icell-release-container-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mtrxAI-icell
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      icell_llamacpp_image: ${{ steps.meta.outputs.icell_llamacpp_image }}
+      icell_ollama_image: ${{ steps.meta.outputs.icell_ollama_image }}
+    steps:
+      - name: Checkout icell
+        uses: actions/checkout@v4
+        with:
+          path: mtrxAI-icell
+
+      - name: Resolve and sync version
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VER="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${INPUT_VERSION}" ]]; then
+            VER="${INPUT_VERSION#v}"
+          else
+            VER="$(python3 scripts/sync_release_version.py get-version)"
+          fi
+          python3 scripts/sync_release_version.py sync "${VER}"
+          eval "$(python3 scripts/sync_release_version.py print-env | sed 's/^/export /')"
+          {
+            echo "version=${MTRXAI_VERSION}"
+            echo "icell_llamacpp_image=${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}"
+            echo "icell_ollama_image=${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "Release version: ${MTRXAI_VERSION}"
+          echo "Images: ${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE} / ${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}"
+
+  docker:
+    name: Docker ${{ matrix.backend }} linux/${{ matrix.arch }}
+    needs: resolve-version
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: mtrxAI-icell
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+            backend: llamacpp
+            image_slug: mtrx-icell-llamacpp
+            remote_output: icell_llamacpp_image
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            backend: llamacpp
+            image_slug: mtrx-icell-llamacpp
+            remote_output: icell_llamacpp_image
+          - runner: ubuntu-latest
+            arch: amd64
+            backend: ollama
+            image_slug: mtrx-icell-ollama
+            remote_output: icell_ollama_image
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            backend: ollama
+            image_slug: mtrx-icell-ollama
+            remote_output: icell_ollama_image
+    env:
+      MTRXAI_VERSION: ${{ needs.resolve-version.outputs.version }}
+      MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE: ${{ needs.resolve-version.outputs.icell_llamacpp_image }}
+      MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.icell_ollama_image }}
+    steps:
+      - name: Checkout icell
+        uses: actions/checkout@v4
+        with:
+          path: mtrxAI-icell
+
+      - name: Sync package version
+        run: python3 scripts/sync_release_version.py sync "${MTRXAI_VERSION}"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build icell image
+        working-directory: mtrxAI-icell
+        run: |
+          chmod +x scripts/build-icell-docker.sh
+          mkdir -p release/docker
+          LOCAL_TAG="${{ matrix.image_slug }}:${MTRXAI_VERSION}-${{ matrix.arch }}"
+          scripts/build-icell-docker.sh "${LOCAL_TAG}" "${{ matrix.backend }}"
+          echo "LOCAL_ICELL_IMAGE=${LOCAL_TAG}" >> "$GITHUB_ENV"
+          if [[ "${{ matrix.remote_output }}" == "icell_ollama_image" ]]; then
+            echo "REMOTE_IMAGE=${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}" >> "$GITHUB_ENV"
+          else
+            echo "REMOTE_IMAGE=${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Save Docker image tarball
+        run: docker save "${LOCAL_ICELL_IMAGE}" | gzip > "release/docker/${{ matrix.image_slug }}-image-${{ matrix.arch }}.tar.gz"
+        working-directory: mtrxAI-icell
+
+      - name: Push arch image to Docker Hub
+        if: >-
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+          (github.event_name == 'workflow_dispatch' && inputs.push_docker)
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DOCKERHUB_USERNAME}" || -z "${DOCKERHUB_TOKEN}" ]]; then
+            echo "::error::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN required to push" >&2
+            exit 1
+          fi
+          echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+          ARCH_TAG="${MTRXAI_VERSION}-${{ matrix.arch }}"
+          docker tag "${LOCAL_ICELL_IMAGE}" "${REMOTE_IMAGE}:${ARCH_TAG}"
+          docker push "${REMOTE_IMAGE}:${ARCH_TAG}"
+          echo "Pushed ${REMOTE_IMAGE}:${ARCH_TAG}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: icell-docker-${{ matrix.backend }}-linux-${{ matrix.arch }}
+          if-no-files-found: error
+          path: |
+            mtrxAI-icell/release/docker/${{ matrix.image_slug }}-image-${{ matrix.arch }}.tar.gz
+
+  docker-manifest:
+    name: Docker multi-arch manifests
+    needs: [resolve-version, docker]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.docker.result == 'success' &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && inputs.push_docker)
+      )
+    runs-on: ubuntu-latest
+    env:
+      MTRXAI_VERSION: ${{ needs.resolve-version.outputs.version }}
+      MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE: ${{ needs.resolve-version.outputs.icell_llamacpp_image }}
+      MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.icell_ollama_image }}
+    steps:
+      - name: Create and push manifest lists
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DOCKERHUB_USERNAME}" || -z "${DOCKERHUB_TOKEN}" ]]; then
+            echo "::error::Docker Hub credentials required" >&2
+            exit 1
+          fi
+          echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USERNAME}" --password-stdin
+          for REMOTE in "${MTRXAI_DOCKER_ICELL_LLAMACPP_IMAGE}" "${MTRXAI_DOCKER_ICELL_OLLAMA_IMAGE}"; do
+            docker buildx imagetools create \
+              -t "${REMOTE}:${MTRXAI_VERSION}" \
+              -t "${REMOTE}:latest" \
+              "${REMOTE}:${MTRXAI_VERSION}-amd64" \
+              "${REMOTE}:${MTRXAI_VERSION}-arm64"
+            echo "Published multi-arch ${REMOTE}:${MTRXAI_VERSION} and :latest"
+          done
+
+  release-summary:
+    name: Release summary
+    needs:
+      - resolve-version
+      - docker
+      - docker-manifest
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write summary
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+          ICELL_LLAMACPP_IMAGE: ${{ needs.resolve-version.outputs.icell_llamacpp_image }}
+          ICELL_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.icell_ollama_image }}
+        run: |
+          {
+            echo "## mtrxAI icell container release v${VERSION}"
+            echo ""
+            echo "### Docker Hub (llamacpp)"
+            echo "- \`${ICELL_LLAMACPP_IMAGE}:${VERSION}\` (multi-arch amd64+arm64)"
+            echo "- \`${ICELL_LLAMACPP_IMAGE}:${VERSION}-amd64\` / \`${ICELL_LLAMACPP_IMAGE}:${VERSION}-arm64\`"
+            echo "- \`${ICELL_LLAMACPP_IMAGE}:latest\`"
+            echo ""
+            echo "### Docker Hub (ollama)"
+            echo "- \`${ICELL_OLLAMA_IMAGE}:${VERSION}\` (multi-arch amd64+arm64)"
+            echo "- \`${ICELL_OLLAMA_IMAGE}:${VERSION}-amd64\` / \`${ICELL_OLLAMA_IMAGE}:${VERSION}-arm64\`"
+            echo "- \`${ICELL_OLLAMA_IMAGE}:latest\`"
+            echo ""
+            echo "### Pull"
+            echo "\`\`\`bash"
+            echo "docker pull ${ICELL_LLAMACPP_IMAGE}:${VERSION}"
+            echo "docker pull ${ICELL_OLLAMA_IMAGE}:${VERSION}"
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
