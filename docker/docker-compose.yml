@@ -1,6 +1,6 @@
 # Sealed inference cell — mtrxai-icell TLS proxy + inference engine (llama.cpp or Ollama).
 #
-#   cd mtrxAI/icell/docker
+#   cd mtrxAI/mtrxAI-icell/docker
 #   cp .env.example .env
 #   docker compose up -d --build                    # llama.cpp (default)
 #   docker compose --profile ollama up -d --build   # Ollama backend
