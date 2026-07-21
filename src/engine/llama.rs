@@ -1,10 +1,10 @@
 use crate::config::Config;
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
+use tracing::info;
 #[cfg(unix)]
 use tracing::warn;
-use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LlamaMode {
@@ -157,7 +157,7 @@ impl Drop for LlamaEngine {
 #[cfg(unix)]
 pub fn spawn_child_reaper() {
     tokio::spawn(async {
-        use tokio::signal::unix::{SignalKind, signal};
+        use tokio::signal::unix::{signal, SignalKind};
         let mut sigchld = match signal(SignalKind::child()) {
             Ok(sig) => sig,
             Err(err) => {

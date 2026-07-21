@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod auth_tests {
     use super::super::{
-        encode_hf_path, hf_hub_host, hf_resolve_download_url, hf_should_attach_auth,
-        select_gguf_files_for_quant, safe_join, validate_filename,
+        encode_hf_path, hf_hub_host, hf_resolve_download_url, hf_should_attach_auth, safe_join,
+        select_gguf_files_for_quant, validate_filename,
     };
 
     #[test]

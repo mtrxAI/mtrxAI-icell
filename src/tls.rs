@@ -71,12 +71,9 @@ fn generate_cert_key(cn: &str) -> Result<GeneratedCert> {
 
     // ring (rcgen default) supports ECDSA P-256, not RSA key generation.
     let key_pair = KeyPair::generate().context("generate ECDSA P-256 key pair")?;
-    let mut params = CertificateParams::new(vec![
-        cn.to_string(),
-        "localhost".into(),
-        "127.0.0.1".into(),
-    ])
-    .context("build certificate params")?;
+    let mut params =
+        CertificateParams::new(vec![cn.to_string(), "localhost".into(), "127.0.0.1".into()])
+            .context("build certificate params")?;
     params
         .subject_alt_names
         .push(SanType::IpAddress(IpAddr::V4(Ipv4Addr::LOCALHOST)));
