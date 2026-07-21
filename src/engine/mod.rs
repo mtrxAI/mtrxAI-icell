@@ -1,7 +1,7 @@
 mod llama;
 mod ollama;
 
-pub use llama::{LlamaEngine, LlamaMode, spawn_child_reaper};
+pub use llama::{spawn_child_reaper, LlamaEngine, LlamaMode};
 pub use ollama::OllamaEngine;
 
 use crate::config::{Config, InferenceBackend};

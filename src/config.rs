@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InferenceBackend {

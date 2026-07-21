@@ -5,11 +5,11 @@ use crate::models::ModelsService;
 use anyhow::{Context, Result};
 use http_body_util::Full;
 use hyper::body::{Bytes, Frame, Incoming};
-use hyper::header::{CONNECTION, HeaderName, UPGRADE};
+use hyper::header::{HeaderName, CONNECTION, UPGRADE};
 use hyper::upgrade::OnUpgrade;
-use hyper::{Method, Request, Response, StatusCode, Uri, header};
-use hyper_util::client::legacy::Client;
+use hyper::{header, Method, Request, Response, StatusCode, Uri};
 use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::client::legacy::Client;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use mtrxai_icell_api::{CellInfo, INFO_PATH};
 use std::sync::Arc;
@@ -78,7 +78,11 @@ impl ProxyService {
         let info = CellInfo {
             engine: self.config.inference_backend.as_str().to_string(),
             inference_api: Some(self.config.inference_backend.inference_api().to_string()),
-            admin_api: Some(mtrxai_icell_api::ADMIN_API_PREFIX.trim_start_matches('/').to_string()),
+            admin_api: Some(
+                mtrxai_icell_api::ADMIN_API_PREFIX
+                    .trim_start_matches('/')
+                    .to_string(),
+            ),
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
         };
         let body = Bytes::from(serde_json::to_vec(&info)?);
@@ -115,7 +119,9 @@ impl ProxyService {
         path: String,
     ) -> Result<Response<Body>> {
         if req.headers().contains_key(UPGRADE) {
-            return Ok(not_implemented("websocket upgrades are not supported for ollama backend"));
+            return Ok(not_implemented(
+                "websocket upgrades are not supported for ollama backend",
+            ));
         }
 
         if path == "/health" && method == Method::GET {
@@ -264,9 +270,9 @@ impl hyper::body::Body for Body {
     ) -> std::task::Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
         match self.get_mut() {
             Body::Full(body) => match std::pin::Pin::new(body).poll_frame(cx) {
-                std::task::Poll::Ready(frame) => std::task::Poll::Ready(frame.map(|result| {
-                    result.map_err(|never| match never {})
-                })),
+                std::task::Poll::Ready(frame) => std::task::Poll::Ready(
+                    frame.map(|result| result.map_err(|never| match never {})),
+                ),
                 std::task::Poll::Pending => std::task::Poll::Pending,
             },
             Body::Incoming(body) => std::pin::Pin::new(body).poll_frame(cx),

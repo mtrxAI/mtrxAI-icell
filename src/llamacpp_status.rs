@@ -59,9 +59,7 @@ pub fn is_model_loaded(
     single_model_path: Option<&str>,
     router_states: &HashMap<String, String>,
 ) -> bool {
-    if single_model_path
-        .is_some_and(|path| model_path_matches(path, model_id))
-    {
+    if single_model_path.is_some_and(|path| model_path_matches(path, model_id)) {
         return true;
     }
     if router_state_is_loaded(router_states, model_id) {
@@ -196,10 +194,7 @@ pub fn router_load_error_is_already_running(status: reqwest::StatusCode, body: &
         && body.to_ascii_lowercase().contains("already running")
 }
 
-pub fn collect_model_ids(
-    models_dir: &str,
-    router_states: &HashMap<String, String>,
-) -> Vec<String> {
+pub fn collect_model_ids(models_dir: &str, router_states: &HashMap<String, String>) -> Vec<String> {
     let mut ids = HashSet::new();
     if let Ok(rd) = std::fs::read_dir(models_dir) {
         for entry in rd.flatten() {

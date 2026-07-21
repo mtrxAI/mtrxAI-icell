@@ -1,5 +1,5 @@
 use crate::config::Config;
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tracing::info;
@@ -30,7 +30,10 @@ impl OllamaEngine {
         cmd.arg("serve");
         cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
         cmd.env("HOME", "/tmp");
-        cmd.env("OLLAMA_HOST", format!("{}:{}", self.config.ollama_host, self.config.ollama_port));
+        cmd.env(
+            "OLLAMA_HOST",
+            format!("{}:{}", self.config.ollama_host, self.config.ollama_port),
+        );
         cmd.env("OLLAMA_MODELS", &self.config.ollama_models);
         cmd.env("OLLAMA_ORIGINS", &self.config.ollama_origins);
 

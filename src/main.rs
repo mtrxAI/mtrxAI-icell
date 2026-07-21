@@ -8,7 +8,7 @@ mod tls;
 
 use anyhow::{Context, Result};
 use config::Config;
-use engine::{EngineHandle, spawn_child_reaper};
+use engine::{spawn_child_reaper, EngineHandle};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
 use hyper::body::{Bytes, Incoming};
@@ -19,8 +19,8 @@ use proxy::ProxyService;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tls::RotatingTls;
-use tokio_rustls::TlsAcceptor;
 use tokio::sync::Mutex;
+use tokio_rustls::TlsAcceptor;
 use tracing::{error, info, warn};
 
 type BoxResponse = Response<BoxBody<Bytes, hyper::Error>>;
@@ -76,7 +76,10 @@ async fn main() -> Result<()> {
 
     let engine = Arc::new(Mutex::new(engine));
 
-    let tls = Arc::new(RotatingTls::new(&config.tls_cert_cn, config.tls_rotate_secs)?);
+    let tls = Arc::new(RotatingTls::new(
+        &config.tls_cert_cn,
+        config.tls_rotate_secs,
+    )?);
 
     let proxy = Arc::new(ProxyService::new(config.clone(), Arc::clone(&engine)));
     let addr: SocketAddr = format!("{}:{}", config.https_bind, config.https_port)
@@ -127,10 +130,11 @@ async fn serve_connection(
         async move { handle_request(proxy, req).await }
     });
 
-    if let Err(err) = hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
-        .http1_only()
-        .serve_connection(io, service)
-        .await
+    if let Err(err) =
+        hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
+            .http1_only()
+            .serve_connection(io, service)
+            .await
     {
         anyhow::bail!("serve HTTP connection: {err}");
     }

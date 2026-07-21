@@ -4,15 +4,11 @@ use crate::llamacpp_status::{
     fetch_router_models, parse_router_model_states, resolve_router_model_id,
     router_load_error_is_already_running, router_status_is_loaded,
 };
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use std::path::Path;
 use tracing::warn;
 
-pub async fn load_model(
-    config: &Config,
-    engine: &mut EngineHandle,
-    model_ref: &str,
-) -> Result<()> {
+pub async fn load_model(config: &Config, engine: &mut EngineHandle, model_ref: &str) -> Result<()> {
     if config.is_llamacpp() {
         load_llamacpp(config, engine, model_ref).await
     } else {
@@ -40,10 +36,7 @@ pub async fn delete_model(
     }
 }
 
-pub async fn register_after_pull(
-    config: &Config,
-    gguf_path: &Path,
-) -> Result<String> {
+pub async fn register_after_pull(config: &Config, gguf_path: &Path) -> Result<String> {
     if config.is_llamacpp() {
         Ok(super::model_id_from_path(gguf_path, &config.models_dir))
     } else {
@@ -51,15 +44,15 @@ pub async fn register_after_pull(
     }
 }
 
-pub async fn auto_load_after_pull(config: &Config, engine: &mut EngineHandle, model_id: &str) -> Result<()> {
+pub async fn auto_load_after_pull(
+    config: &Config,
+    engine: &mut EngineHandle,
+    model_id: &str,
+) -> Result<()> {
     load_model(config, engine, model_id).await
 }
 
-async fn load_llamacpp(
-    config: &Config,
-    engine: &mut EngineHandle,
-    model_ref: &str,
-) -> Result<()> {
+async fn load_llamacpp(config: &Config, engine: &mut EngineHandle, model_ref: &str) -> Result<()> {
     let filename = normalize_gguf_filename(model_ref)?;
     super::validate_filename(&filename)?;
     let model_path = super::safe_join(&config.models_dir, &filename)?;
@@ -83,9 +76,7 @@ async fn load_llamacpp(
         }
     }
 
-    let llama = engine
-        .llama()
-        .context("llama engine not active")?;
+    let llama = engine.llama().context("llama engine not active")?;
     llama
         .restart_mode(LlamaMode::Model {
             path: model_path.display().to_string(),
@@ -96,9 +87,7 @@ async fn load_llamacpp(
 }
 
 async fn unload_llamacpp(engine: &mut EngineHandle) -> Result<()> {
-    let llama = engine
-        .llama()
-        .context("llama engine not active")?;
+    let llama = engine.llama().context("llama engine not active")?;
     llama
         .restart_mode(LlamaMode::Router)
         .await

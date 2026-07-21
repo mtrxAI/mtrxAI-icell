@@ -6,15 +6,16 @@ mod tests;
 
 use crate::config::Config;
 use crate::engine::EngineHandle;
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use dashmap::DashMap;
+use hf_hub::{split_id, HFClient};
 use http_body_util::{BodyExt, Full};
 use hyper::body::{Bytes, Incoming};
-use hyper::{Method, Request, Response, StatusCode, header};
+use hyper::{header, Method, Request, Response, StatusCode};
 use mtrxai_auth::verify_bearer_token;
 use mtrxai_icell_api::{
-    JobStatus, MODELS_DELETE_PATH, MODELS_LOAD_PATH, MODELS_PULL_PATH, MODELS_UNLOAD_PATH,
-    PullJobRecord, PullRequest,
+    JobStatus, PullJobRecord, PullRequest, MODELS_DELETE_PATH, MODELS_LOAD_PATH, MODELS_PULL_PATH,
+    MODELS_UNLOAD_PATH,
 };
 use reqwest::header as reqwest_header;
 use serde::Deserialize;
@@ -23,7 +24,6 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::fs;
 use tokio::sync::Mutex;
-use hf_hub::{split_id, HFClient};
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -108,8 +108,7 @@ impl ModelsService {
             .await
             .context("read pull request body")?
             .to_bytes();
-        let pull: PullRequest =
-            serde_json::from_slice(&body).context("parse pull request json")?;
+        let pull: PullRequest = serde_json::from_slice(&body).context("parse pull request json")?;
 
         validate_repo(&pull.repo)?;
 
@@ -141,7 +140,11 @@ impl ModelsService {
         )
     }
 
-    async fn get_pull_job(&self, job_id: &str, req: Request<Incoming>) -> Result<Response<Full<Bytes>>> {
+    async fn get_pull_job(
+        &self,
+        job_id: &str,
+        req: Request<Incoming>,
+    ) -> Result<Response<Full<Bytes>>> {
         if !authorized(&req, &self.config.cell_admin_token) {
             return json_response(
                 StatusCode::UNAUTHORIZED,
@@ -250,7 +253,8 @@ impl ModelsService {
                         warn!(error = %err, model_id = %model_id, "auto-load after pull failed");
                     }
                 } else if self.config.is_llamacpp() {
-                    if let Err(err) = lifecycle::llamacpp_router_load(&self.config, &model_id).await {
+                    if let Err(err) = lifecycle::llamacpp_router_load(&self.config, &model_id).await
+                    {
                         warn!(error = %err, model_id = %model_id, "auto-load after pull failed");
                     }
                 }
@@ -274,11 +278,7 @@ impl ModelsService {
         }
     }
 
-    async fn execute_pull(
-        &self,
-        job_id: &str,
-        pull: &PullRequest,
-    ) -> Result<(PathBuf, String)> {
+    async fn execute_pull(&self, job_id: &str, pull: &PullRequest) -> Result<(PathBuf, String)> {
         let files = resolve_hf_gguf_files(&self.config, &pull.repo, pull.quant.as_deref()).await?;
         if files.is_empty() {
             bail!("no .gguf files found for repo {}", pull.repo);
@@ -329,7 +329,9 @@ impl ModelsService {
         }
 
         if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).await.context("create model parent dir")?;
+            fs::create_dir_all(parent)
+                .await
+                .context("create model parent dir")?;
         }
 
         let tmp_dir = safe_join(&self.config.models_dir, ".tmp")?;

@@ -1,5 +1,5 @@
 use crate::config::Config;
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use futures_util::StreamExt;
 use std::path::Path;
 use tracing::info;
