@@ -11,8 +11,13 @@ use dashmap::DashMap;
 use http_body_util::{BodyExt, Full};
 use hyper::body::{Bytes, Incoming};
 use hyper::{Method, Request, Response, StatusCode, header};
+use mtrxai_auth::verify_bearer_token;
+use mtrxai_icell_api::{
+    JobStatus, MODELS_DELETE_PATH, MODELS_LOAD_PATH, MODELS_PULL_PATH, MODELS_UNLOAD_PATH,
+    PullJobRecord, PullRequest,
+};
 use reqwest::header as reqwest_header;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -29,36 +34,6 @@ pub struct ModelsService {
     config: Config,
     jobs: Arc<DashMap<String, PullJobRecord>>,
     engine: Arc<Mutex<EngineHandle>>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub struct PullJobRecord {
-    pub id: String,
-    pub status: JobStatus,
-    pub repo: String,
-    pub quant: Option<String>,
-    pub path: Option<String>,
-    pub model_id: Option<String>,
-    pub error: Option<String>,
-    pub started_at: u64,
-    pub finished_at: Option<u64>,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum JobStatus {
-    Queued,
-    Running,
-    Importing,
-    Ok,
-    Failed,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PullRequest {
-    pub repo: String,
-    pub quant: Option<String>,
-    pub filename: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,25 +66,25 @@ impl ModelsService {
         path: &str,
         req: Request<Incoming>,
     ) -> Result<Response<Full<Bytes>>> {
-        if path == "/mtrxai/v1/models/pull" && *method == Method::POST {
+        if path == MODELS_PULL_PATH && *method == Method::POST {
             return self.post_pull(req).await;
         }
 
-        if let Some(job_id) = path.strip_prefix("/mtrxai/v1/models/pull/") {
+        if let Some(job_id) = path.strip_prefix(&format!("{MODELS_PULL_PATH}/")) {
             if *method == Method::GET && !job_id.is_empty() {
                 return self.get_pull_job(job_id, req).await;
             }
         }
 
-        if path == "/mtrxai/v1/models/load" && *method == Method::POST {
+        if path == MODELS_LOAD_PATH && *method == Method::POST {
             return self.post_load(req).await;
         }
 
-        if path == "/mtrxai/v1/models/unload" && *method == Method::POST {
+        if path == MODELS_UNLOAD_PATH && *method == Method::POST {
             return self.post_unload(req).await;
         }
 
-        if path == "/mtrxai/v1/models/delete" && *method == Method::POST {
+        if path == MODELS_DELETE_PATH && *method == Method::POST {
             return self.post_delete(req).await;
         }
 
@@ -457,14 +432,16 @@ async fn resolve_hf_gguf_files(
 }
 
 fn authorized(req: &Request<Incoming>, expected: &str) -> bool {
+    // Empty token keeps pull/load routes open (dev). Prefer CELL_ADMIN_TOKEN in prod;
+    // set MTRXAI_ICELL_REQUIRE_ADMIN=1 to refuse boot without a token (see main.rs).
     if expected.is_empty() {
         return true;
     }
-    req.headers()
+    let header_value = req
+        .headers()
         .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .is_some_and(|token| token == expected)
+        .and_then(|v| v.to_str().ok());
+    verify_bearer_token(header_value, expected)
 }
 
 fn build_hf_http_client() -> Result<reqwest::Client> {

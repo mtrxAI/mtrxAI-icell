@@ -9,12 +9,36 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mtrxAI-icell
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout icell
+        uses: actions/checkout@v4
+        with:
+          path: mtrxAI-icell
+
+      - name: Checkout common
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ format('{0}/mtrxAI-common', github.repository_owner) }}
+          path: mtrxAI-common
+          ref: ${{ vars.MTRXAI_COMMON_REF || 'main' }}
+          token: ${{ secrets.MTRXAI_COMMON_READ_TOKEN || github.token }}
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mtrxAI-icell
+
+      - name: fmt
+        run: cargo fmt --check
+
+      - name: clippy
+        run: cargo clippy --all-targets
 
       - name: Build and test icell
         run: |

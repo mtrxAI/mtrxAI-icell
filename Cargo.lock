@@ -1434,8 +1434,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fafa6961cabd9c63bcd77a45d7e3b7f3b552b70417831fb0f56db717e72407e"
 
 [[package]]
+name = "mtrxai-auth"
+version = "0.1.5"
+
+[[package]]
 name = "mtrxai-icell"
-version = "0.1.0"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1447,6 +1451,8 @@ dependencies = [
  "hyper",
  "hyper-util",
  "libc",
+ "mtrxai-auth",
+ "mtrxai-icell-api",
  "rcgen",
  "reqwest 0.12.28",
  "rustls",
@@ -1457,6 +1463,13 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "mtrxai-icell-api"
+version = "0.1.5"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

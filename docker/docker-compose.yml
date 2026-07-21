@@ -11,8 +11,9 @@
 services:
   icell:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      # Org root (sibling of mtrxAI-icell/ and mtrxAI-common/) — matches Dockerfile COPY paths.
+      context: ../..
+      dockerfile: mtrxAI-icell/docker/Dockerfile
       args:
         INFERENCE_BACKEND: llamacpp
         LLAMA_IMAGE: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
@@ -61,8 +62,8 @@ services:
   ollama:
     profiles: [ollama]
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: mtrxAI-icell/docker/Dockerfile
       args:
         INFERENCE_BACKEND: ollama
         OLLAMA_IMAGE: ${OLLAMA_IMAGE:-ollama/ollama:latest}

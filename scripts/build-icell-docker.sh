@@ -11,10 +11,14 @@
 # Env:
 #   MTRXAI_VERSION (optional, logged only)
 #   LLAMA_IMAGE / OLLAMA_IMAGE (optional base image overrides)
+#
+# Build context is the mtrxAI org root (parent of this repo) so path deps on
+# mtrxAI-common resolve.
 
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ICELL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ORG_ROOT="$(cd "${ICELL_DIR}/.." && pwd)"
 IMAGE_REF="${1:-mtrx-icell-llamacpp:local}"
 BACKEND="${2:-llamacpp}"
 VERSION="${MTRXAI_VERSION:-unknown}"
@@ -27,10 +31,16 @@ case "${BACKEND}" in
     ;;
 esac
 
+if [[ ! -d "${ORG_ROOT}/mtrxAI-common" ]]; then
+  echo "error: expected sibling checkout at ${ORG_ROOT}/mtrxAI-common" >&2
+  exit 1
+fi
+
 echo "==> Docker build ${IMAGE_REF} (backend=${BACKEND} version=${VERSION})"
+echo "==> context: ${ORG_ROOT}"
 
 BUILD_ARGS=(
-  -f "${ROOT_DIR}/docker/Dockerfile"
+  -f "${ICELL_DIR}/docker/Dockerfile"
   --build-arg "INFERENCE_BACKEND=${BACKEND}"
   -t "${IMAGE_REF}"
 )
@@ -42,6 +52,6 @@ if [[ -n "${OLLAMA_IMAGE:-}" ]]; then
   BUILD_ARGS+=(--build-arg "OLLAMA_IMAGE=${OLLAMA_IMAGE}")
 fi
 
-docker build "${BUILD_ARGS[@]}" "${ROOT_DIR}"
+docker build "${BUILD_ARGS[@]}" "${ORG_ROOT}"
 
 echo "Built ${IMAGE_REF}"
