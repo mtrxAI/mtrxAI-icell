@@ -11,7 +11,7 @@ use hyper::{Method, Request, Response, StatusCode, Uri, header};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioIo};
-use serde_json::json;
+use mtrxai_icell_api::{CellInfo, INFO_PATH};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::warn;
@@ -57,7 +57,7 @@ impl ProxyService {
         let method = req.method().clone();
         let path = req.uri().path().to_string();
 
-        if path == "/mtrxai/v1/info" && method == Method::GET {
+        if path == INFO_PATH && method == Method::GET {
             return self.mtrxai_info().await;
         }
 
@@ -75,12 +75,13 @@ impl ProxyService {
     }
 
     async fn mtrxai_info(&self) -> Result<Response<Body>> {
-        let body = Bytes::from(serde_json::to_vec(&json!({
-            "engine": self.config.inference_backend.as_str(),
-            "inference_api": self.config.inference_backend.inference_api(),
-            "admin_api": "mtrxai/v1",
-            "version": env!("CARGO_PKG_VERSION"),
-        }))?);
+        let info = CellInfo {
+            engine: self.config.inference_backend.as_str().to_string(),
+            inference_api: Some(self.config.inference_backend.inference_api().to_string()),
+            admin_api: Some(mtrxai_icell_api::ADMIN_API_PREFIX.trim_start_matches('/').to_string()),
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        };
+        let body = Bytes::from(serde_json::to_vec(&info)?);
         let mut resp = Response::new(Body::Full(Full::new(body)));
         *resp.status_mut() = StatusCode::OK;
         resp.headers_mut().insert(

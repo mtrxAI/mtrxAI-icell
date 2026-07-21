@@ -49,8 +49,21 @@ async fn main() -> Result<()> {
         "starting mtrxai-icell"
     );
 
+    // Auth: CELL_ADMIN_TOKEN uses constant-time bearer verify (mtrxai-auth).
+    // Empty token leaves /mtrxai/v1/models/* open (legacy/dev). Fail closed with
+    // MTRXAI_ICELL_REQUIRE_ADMIN=1. INFERENCE_DEV=1 softens the warning only.
     if config.cell_admin_token.is_empty() {
-        warn!("CELL_ADMIN_TOKEN is empty: /mtrxai/v1/models/* pull routes are unauthenticated");
+        if env_truthy("MTRXAI_ICELL_REQUIRE_ADMIN") {
+            anyhow::bail!("CELL_ADMIN_TOKEN is required when MTRXAI_ICELL_REQUIRE_ADMIN=1");
+        }
+        if env_truthy("INFERENCE_DEV") {
+            warn!("CELL_ADMIN_TOKEN is empty (INFERENCE_DEV): admin model routes are open");
+        } else {
+            warn!(
+                "CELL_ADMIN_TOKEN is empty: /mtrxai/v1/models/* routes are unauthenticated \
+                 (set a token, or MTRXAI_ICELL_REQUIRE_ADMIN=1 to refuse boot)"
+            );
+        }
     }
     if config.hf_token.is_none() {
         warn!("HF_TOKEN is not set: gated Hugging Face models will fail with 403");
@@ -159,6 +172,17 @@ fn internal_error() -> BoxResponse {
                 .boxed(),
         )
         .expect("valid error response")
+}
+
+fn env_truthy(name: &str) -> bool {
+    std::env::var(name)
+        .map(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
 }
 
 async fn shutdown_signal() {

@@ -1,12 +1,10 @@
 # Sealed inference cell: mtrxai-icell (TLS proxy + HF pull) + llama-server or ollama serve.
 #
-# llama.cpp (default):
-#   docker build -f docker/Dockerfile --build-arg INFERENCE_BACKEND=llamacpp \
-#     --build-arg LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-cuda -t mtrxai-icell .
+# Build from mtrxAI org root (sibling of mtrxAI-icell/ and mtrxAI-common/):
+#   docker build -f mtrxAI-icell/docker/Dockerfile \
+#     --build-arg INFERENCE_BACKEND=llamacpp -t mtrxai-icell .
 #
-# Ollama:
-#   docker build -f docker/Dockerfile --build-arg INFERENCE_BACKEND=ollama \
-#     --build-arg OLLAMA_IMAGE=ollama/ollama:latest -t mtrxai-icell-ollama .
+# Or: scripts/build-icell-docker.sh (sets context to org root).
 
 ARG INFERENCE_BACKEND=llamacpp
 ARG LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server
@@ -14,9 +12,14 @@ ARG OLLAMA_IMAGE=ollama/ollama:latest
 
 # --- Stage 1: build Rust icell supervisor/proxy ---
 FROM rust:1.89-bookworm AS cell-builder
-WORKDIR /build
-COPY Cargo.toml ./
-COPY src ./src
+WORKDIR /usr/src/mtrxai
+
+COPY mtrxAI-common/mtrxai-icell-api ./mtrxAI-common/mtrxai-icell-api
+COPY mtrxAI-common/mtrxai-auth ./mtrxAI-common/mtrxai-auth
+COPY mtrxAI-icell/Cargo.toml mtrxAI-icell/Cargo.lock* ./mtrxAI-icell/
+COPY mtrxAI-icell/src ./mtrxAI-icell/src
+
+WORKDIR /usr/src/mtrxai/mtrxAI-icell
 RUN cargo build --release
 
 # --- Stage 2a: llama.cpp runtime ---
@@ -31,7 +34,7 @@ RUN apt-get update \
     && (getent group celluser >/dev/null 2>&1 || groupadd --system --gid 65532 celluser) \
     && (id -u celluser >/dev/null 2>&1 || useradd --system --uid 65532 --gid 65532 --home-dir /app --shell /usr/sbin/nologin celluser)
 
-COPY --from=cell-builder /build/target/release/mtrxai-icell /usr/local/bin/mtrxai-icell
+COPY --from=cell-builder /usr/src/mtrxai/mtrxAI-icell/target/release/mtrxai-icell /usr/local/bin/mtrxai-icell
 
 ENV PATH=/app:/usr/local/bin \
     LD_LIBRARY_PATH=/app \
@@ -68,7 +71,7 @@ RUN apt-get update \
     && (getent group celluser >/dev/null 2>&1 || groupadd --system --gid 65532 celluser) \
     && (id -u celluser >/dev/null 2>&1 || useradd --system --uid 65532 --gid 65532 --home-dir /app --shell /usr/sbin/nologin celluser)
 
-COPY --from=cell-builder /build/target/release/mtrxai-icell /usr/local/bin/mtrxai-icell
+COPY --from=cell-builder /usr/src/mtrxai/mtrxAI-icell/target/release/mtrxai-icell /usr/local/bin/mtrxai-icell
 
 ENV PATH=/usr/local/bin:/usr/bin:/bin \
     INFERENCE_BACKEND=ollama \

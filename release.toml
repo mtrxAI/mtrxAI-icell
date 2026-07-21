@@ -1,5 +1,5 @@
 # Canonical release version for the inference cell containers.
-version = "0.1.0"
+version = "0.2.1"
 
 [docker]
 registry = "docker.io/mtrxai"

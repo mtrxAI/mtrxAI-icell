@@ -1,6 +1,6 @@
 [package]
 name = "mtrxai-icell"
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 
 [[bin]]
@@ -8,6 +8,8 @@ name = "mtrxai-icell"
 path = "src/main.rs"
 
 [dependencies]
+mtrxai-icell-api = { path = "../mtrxAI-common/mtrxai-icell-api" }
+mtrxai-auth = { path = "../mtrxAI-common/mtrxai-auth" }
 anyhow = "1.0"
 arc-swap = "1.7"
 bytes = "1"

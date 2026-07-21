@@ -103,7 +103,16 @@ jobs:
         with:
           path: mtrxAI-icell
 
+      - name: Checkout common
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ format('{0}/mtrxAI-common', github.repository_owner) }}
+          path: mtrxAI-common
+          ref: ${{ vars.MTRXAI_COMMON_REF || 'main' }}
+          token: ${{ secrets.MTRXAI_COMMON_READ_TOKEN || github.token }}
+
       - name: Sync package version
+        working-directory: mtrxAI-icell
         run: python3 scripts/sync_release_version.py sync "${MTRXAI_VERSION}"
 
       - uses: dtolnay/rust-toolchain@stable
