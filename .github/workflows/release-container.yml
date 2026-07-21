@@ -35,7 +35,7 @@ jobs:
       ollama_image: ${{ steps.meta.outputs.ollama_image }}
     steps:
       - name: Checkout icell
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: mtrxAI-icell
 
@@ -99,12 +99,12 @@ jobs:
       MTRXAI_DOCKER_OLLAMA_IMAGE: ${{ needs.resolve-version.outputs.ollama_image }}
     steps:
       - name: Checkout icell
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: mtrxAI-icell
 
       - name: Checkout common
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ format('{0}/mtrxAI-common', github.repository_owner) }}
           path: mtrxAI-common
