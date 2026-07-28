@@ -154,7 +154,7 @@ jobs:
           docker push "${REMOTE_IMAGE}:${ARCH_TAG}"
           echo "Pushed ${REMOTE_IMAGE}:${ARCH_TAG}"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: icell-docker-${{ matrix.backend }}-linux-${{ matrix.arch }}
           if-no-files-found: error
