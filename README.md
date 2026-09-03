@@ -1,6 +1,8 @@
 # mtrxAI icell (inference cell)
 
-Local LLM proxy / cell runtime (`mtrxai-icell`).
+Local LLM proxy / cell runtime (`mtrxai-icell`). Production **peer + icell** compose uses this image as the sealed engine behind an attested peer.
+
+**Why a cell (vs raw Ollama):** peer binary attestation does not cover the LLM process. Icell keeps the engine on loopback, publishes only HTTPS `:8443`, and is the intended target of future `ATTESTATION_LLM_SERVER`. Details: [mtrxAI-peer/docs/ATTESTATION.md](../mtrxAI-peer/docs/ATTESTATION.md).
 
 ## Build
 
